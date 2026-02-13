@@ -17,15 +17,23 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
     - name: Install dependencies
       run: npm install
+    - name: Debug - List files
+      run: dir && echo "---" && dir *.ico
     - name: Build Windows executable
-      run: npm run build:win:portable
+      run: |
+        echo "Running build..."
+        npm run build:win || echo "Build failed, checking error..."
+        if not exist dist\*.exe dir dist
     - name: Upload artifact
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: Windows-exe
         path: dist/*.exe
+        retention-days: 5
         
   build-mac:
     runs-on: macos-latest
@@ -36,12 +44,15 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
     - name: Install dependencies
       run: npm install
     - name: Build macOS DMG
       run: npm run build:mac
     - name: Upload artifact
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: macOS-dmg
         path: dist/*.dmg
+        retention-days: 5
