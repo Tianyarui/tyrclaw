@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Claw 🦞</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+    *::-webkit-scrollbar { display: none; }
+    html, body {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    }
+    .container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    /* ===== 流体球 67px ===== */
+    .pet-wrapper {
+        width: 67px;
+        height: 67px;
+        position: relative;
+        cursor: grab;
+        will-change: transform;
+    }
+    .pet-wrapper:active { cursor: grabbing; }
+
+    .inner-fluid {
+        position: absolute;
+        top: 3px; left: 3px; right: 3px; bottom: 3px;
+        border-radius: 50%;
+        overflow: hidden;
+        z-index: 1;
+        background: linear-gradient(135deg, #ffb3b3, #fed6e3);
+        transition: filter 0.4s ease;
+    }
+    .fluid-blob {
+        position: absolute;
+        width: 130%; height: 130%; top: -15%; left: -15%;
+        background:
+            radial-gradient(circle at 30% 30%, rgba(235,87,87,0.85), transparent 40%),
+            radial-gradient(circle at 70% 65%, rgba(255,154,108,0.8), transparent 40%);
+        animation: fluid-spin 8s linear infinite;
+    }
+    .fluid-blob-2 {
+        position: absolute;
+        width: 110%; height: 110%; top: -5%; left: -5%;
+        background:
+            radial-gradient(circle at 60% 30%, rgba(255,200,150,0.4), transparent 35%),
+            radial-gradient(circle at 35% 70%, rgba(220,60,60,0.3), transparent 35%);
+        animation: fluid-spin-r 12s linear infinite;
+    }
+
+    .glass-shell {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        border-radius: 50%; z-index: 2;
+        /* 🔮 升级琉璃感：更强的渐变高光 */
+        background: 
+            radial-gradient(circle at 25% 25%, rgba(255,255,255,0.35), transparent 30%),
+            radial-gradient(circle at 80% 80%, rgba(255,255,255,0.08), transparent 40%),
+            radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03), transparent);
+        box-shadow:
+            /* 内部高光更强 */
+            inset -3px -3px 12px rgba(255,255,255,0.15),
+            inset 3px 3px 12px rgba(255,255,255,0.45),
+            /* 外部光晕 */
+            0px 4px 12px rgba(220,80,80,0.15),
+            0px 0px 20px rgba(255,255,255,0.1);
+        backdrop-filter: blur(2px);
+        border: 1.5px solid rgba(255,255,255,0.4);
+        /* 🎨 过渡也要平滑（1秒） */
+        transition: box-shadow 1.0s cubic-bezier(0.4, 0.0, 0.2, 1), border 1.0s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+    .glass-shell::before {
+        content: '';
+        /* 🌟 主高光更大更亮 */
+        position: absolute; top: 10%; left: 15%; width: 35%; height: 18%;
+        border-radius: 50%; 
+        background: 
+            radial-gradient(ellipse at center, rgba(255,255,255,0.8), rgba(255,255,255,0.3) 60%, transparent);
+        filter: blur(2px); 
+        transform: rotate(-40deg);
+        /* 高光也要过渡（1秒） */
+        transition: opacity 1.0s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+    /* 🔮 新增���第二高光 */
+    .glass-shell::after {
+        content: '';
+        position: absolute; bottom: 20%; right: 18%; width: 20%; height: 12%;
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgba(255,255,255,0.4), transparent 70%);
+        filter: blur(2px);
+        transform: rotate(25deg);
+        /* 高光也要过渡（1秒） */
+        transition: opacity 1.0s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+
+    /* 胶囊眼睛 — 大占比 */
+    .eyes-container {
+        position: absolute; z-index: 3;
+        top: 16%; left: 10%; width: 80%; height: 50%;
+        display: flex; justify-content: center; align-items: center;
+        gap: 12px;
+        pointer-events: none;
+        overflow: visible;
+    }
+    .eye {
+        width: 11px; height: 19px;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 0 8px rgba(255,255,255,0.9), 0 0 16px rgba(255,255,255,0.4);
+        transition: width 0.18s, height 0.18s, border-radius 0.18s, transform 0.18s cubic-bezier(0.25, 1, 0.5, 1);
+        transform-origin: center center;
+    }
+
+    /* 腮红 */
+    .blush {
+        position: absolute; z-index: 3;
+        width: 14px; height: 8px; border-radius: 50%;
+        background: rgba(255,130,130,0.25); filter: blur(3px);
+        pointer-events: none; 
+        /* 🎨 2秒平滑过渡 */
+        transition: background 2.0s cubic-bezier(0.33, 0.0, 0.2, 1), opacity 0.6s ease; 
+        opacity: 0.8;
+    }
+    .blush-l { top: 58%; left: 8%; }
+    .blush-r { top: 58%; right: 8%; }
+
+    /* 气泡装饰 */
+    .bub {
+        position: absolute; border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), rgba(255,255,255,0.06));
+        border: 1px solid rgba(255,255,255,0.12);
+        z-index: 0; opacity: 0; pointer-events: none;
+    }
+    .bub-1 { width: 5px; height: 5px; left: -5px; top: 60%; animation: bub 5s ease-in infinite 0s; }
+    .bub-2 { width: 3px; height: 3px; right: -4px; top: 40%; animation: bub 6.5s ease-in infinite 2s; }
+
+    .particles {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 10;
+    }
+
+    /* ===== 图标工具栏 ===== */
+    .toolbar {
+        position: absolute;
+        top: calc(50% + 46px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 20;
+    }
+    .container:hover .toolbar {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .tool-icon {
+        width: 26px; height: 26px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.85);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .tool-icon svg {
+        width: 13px; height: 13px;
+        stroke: #666; fill: none;
+        stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .tool-icon:hover {
+        transform: scale(1.2);
+        box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+    }
+    .tool-icon:active { transform: scale(0.9); }
+
+    /* 模型切换按钮 */
+    .model-switch-btn {
+        min-width: 26px;
+        padding: 0 4px;
+        border-radius: 13px;
+    }
+    .model-switch-btn:hover {
+        background: rgba(255,255,255,0.95);
+    }
+    .tool-icon.active {
+        background: rgba(255,255,255,1);
+        box-shadow: 0 0 8px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    /* 输入条 */
+    .input-bar {
+        position: absolute;
+        top: calc(50% + 78px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        z-index: 20;
+    }
+    .input-bar.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .input-bar input {
+        width: 160px;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.85);
+        font-size: 11px;
+        outline: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .input-bar button {
+        padding: 4px 8px;
+        border: none;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.85);
+        font-size: 11px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    @keyframes fluid-spin {
+        0% { transform: rotate(0deg) scale(1); }
+        50% { transform: rotate(180deg) scale(1.08); }
+        100% { transform: rotate(360deg) scale(1); }
+    }
+    @keyframes fluid-spin-r {
+        0% { transform: rotate(360deg) scale(1.05); }
+        50% { transform: rotate(180deg) scale(0.95); }
+        100% { transform: rotate(0deg) scale(1.05); }
+    }
+    @keyframes bub {
+        0% { opacity: 0; transform: translateY(0) scale(0.3); }
+        15% { opacity: 0.5; }
+        100% { opacity: 0; transform: translateY(-30px) translateX(5px) scale(1); }
+    }
+    @keyframes squish {
+        0% { transform: scale(1, 1); }
+        25% { transform: scale(1.15, 0.85); }
+        50% { transform: scale(0.9, 1.1); }
+        75% { transform: scale(1.05, 0.95); }
+        100% { transform: scale(1, 1); }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="pet-wrapper" id="pet">
+        <div class="inner-fluid" id="fluid">
+            <div class="fluid-blob" id="blob1"></div>
+            <div class="fluid-blob-2" id="blob2"></div>
+        </div>
+        <div class="glass-shell"></div>
+        <div class="eyes-container" id="eyes">
+            <div class="eye" id="eyeL"></div>
+            <div class="eye" id="eyeR"></div>
+        </div>
+        <div class="blush blush-l" id="blushL"></div>
+        <div class="blush blush-r" id="blushR"></div>
+        <div class="bub bub-1"></div>
+        <div class="bub bub-2"></div>
+        <div class="particles" id="particles"></div>
+    </div>
+
+    <!-- 图标工具栏 -->
+    <div class="toolbar" id="toolbar">
+        <div class="tool-icon" id="btnChat" title="发消息" onclick="toggleInput()">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div class="tool-icon" id="btnVoice" title="语音" onclick="toggleVoice()">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+        <div class="tool-icon" id="btnScreenshot" title="截图" onclick="screenshot()">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div class="tool-icon model-switch-btn" id="btnModelSwitch" title="切换模型" onclick="cycleModel()">
+            <span id="modelBadge" style="font-size:9px;font-weight:700;color:#666;user-select:none;">OP</span>
+        </div>
+    </div>
+
+    <!-- 输入条 -->
+    <div class="input-bar" id="inputBar">
+        <input type="text" id="input" placeholder="说点什么..." onkeypress="if(event.key==='Enter')send()">
+        <button onclick="send()">↑</button>
+    </div>
+</div>
+
+<script>
+let ipcRenderer;
+try { ipcRenderer = require('electron').ipcRenderer; } catch(e) {}
+
+const pet = document.getElementById('pet');
+const eyeL = document.getElementById('eyeL');
+const eyeR = document.getElementById('eyeR');
+const fluid = document.getElementById('fluid');
+const blob1 = document.getElementById('blob1');
+const blob2 = document.getElementById('blob2');
+let _moodTimer = null;
+const blushL = document.getElementById('blushL');
+const blushR = document.getElementById('blushR');
+const particlesEl = document.getElementById('particles');
+const inputBar = document.getElementById('inputBar');
+const inputEl = document.getElementById('input');
+const btnVoice = document.getElementById('btnVoice');
+
+let voiceOn = true;
+let isConnected = false;
+
+// ===== 60fps 动画 =====
+let t = 0, squishing = false, targetScale = 1, curScale = 1, breathExtra = 0;
+
+// 有机运动参数
+let deepBreathPhase = 0;       // 深呼吸相位（0=正常，>0=正在深呼吸）
+let fidgetSeed = Math.random() * 100;  // 微动作种子
+let lastInteraction = Date.now();      // 上次互动时间
+
+function loop() {
+    t += 0.016;
+    curScale += (targetScale - curScale) * 0.08;
+
+    // === 多频叠加有机浮动（替代单一正弦波）===
+    const floatY = Math.sin(t * 1.3) * 3.5
+                 + Math.sin(t * 0.67) * 2
+                 + Math.sin(t * 2.3) * 0.6;
+    const floatR = Math.sin(t * 0.9) * 0.3
+                 + Math.sin(t * 0.37) * 0.2;
+
+    // === 呼吸：基础 + 偶尔深呼吸 ===
+    let breathScale = 1 + Math.sin(t * 2) * 0.01
+                        + Math.sin(t * 0.8) * 0.005;
+    if (deepBreathPhase > 0) {
+        // 深呼吸：吸气膨胀 → 呼气收缩
+        breathScale += Math.sin(deepBreathPhase) * 0.025;
+        deepBreathPhase += 0.04;
+        if (deepBreathPhase > Math.PI) deepBreathPhase = 0;
+    }
+
+    // === 微动作：细微的重心移动 ===
+    const fidgetX = Math.sin(t * 0.23 + fidgetSeed) * 0.6;
+    const fidgetR = Math.sin(t * 0.17 + fidgetSeed * 2) * 0.12;
+
+    const bounce = breathExtra > 0 ? Math.sin(t * 12) * breathExtra : 0;
+
+    if (!squishing) {
+        pet.style.transform = `translateX(${fidgetX}px) translateY(${floatY + bounce}px) rotate(${floatR + fidgetR}deg) scale(${curScale * breathScale})`;
+    }
+    requestAnimationFrame(loop);
+}
+loop();
+
+// 深呼吸/叹气：每 20-40 秒触发一次
+setInterval(() => {
+    if (currentMood === 'talking' || currentMood === 'thinking') return;
+    if (deepBreathPhase === 0 && Math.random() < 0.5) {
+        deepBreathPhase = 0.01;
+    }
+}, 20000 + Math.random() * 20000);
+
+// ===== 眼睛表情 =====
+
+// 过渡速度预设
+const EYE_SPEED = {
+    snap:   '0s',                  // 瞬切（用于眨眼闭合瞬间）
+    fast:   '0.08s',               // 快速（眨眼睁开）
+    normal: '0.18s',               // 常规
+    smooth: '0.3s',                // 平滑（情绪过渡）
+    slow:   '0.45s',               // 慢（白日梦、发呆）
+    drift:  '0.6s',                // 极慢（眼神缓慢飘移）
+};
+
+function _setEyeTransition(speed) {
+    const dur = EYE_SPEED[speed] || speed || EYE_SPEED.normal;
+    const ease = speed === 'snap' || speed === 'fast'
+        ? 'linear'
+        : speed === 'slow' || speed === 'drift'
+            ? 'cubic-bezier(0.4, 0, 0.2, 1)'
+            : 'cubic-bezier(0.25, 1, 0.5, 1)';
+    const t = `width ${dur} ${ease}, height ${dur} ${ease}, border-radius ${dur} ${ease}, transform ${dur} ${ease}`;
+    eyeL.style.transition = t;
+    eyeR.style.transition = t;
+}
+
+function setEyes(L, R, speed) {
+    if (speed) _setEyeTransition(speed);
+    const d = { w:11, h:19, br:'6px', tx:0, ty:0, sx:1, sy:1, rot:0 };
+    const l = { ...d, ...L };
+    const r = R ? { ...d, ...R } : { ...l };
+    eyeL.style.width = l.w+'px'; eyeL.style.height = l.h+'px'; eyeL.style.borderRadius = l.br;
+    eyeL.style.transform = `translate(${l.tx}px,${l.ty}px) scale(${l.sx},${l.sy}) rotate(${l.rot}deg)`;
+    eyeR.style.width = r.w+'px'; eyeR.style.height = r.h+'px'; eyeR.style.borderRadius = r.br;
+    eyeR.style.transform = `translate(${r.tx}px,${r.ty}px) scale(${r.sx},${r.sy}) rotate(${r.rot}deg)`;
+    // 用完后恢复默认速度
+    if (speed) setTimeout(() => _setEyeTransition('normal'), 20);
+}
+
+const EXPR = {
+    // --- normal 速度 (0.18s, 默认) ---
+    normal:     () => setEyes({ w:11, h:19, br:'6px' }),
+    lookLeft:   () => setEyes({ w:11, h:19, br:'6px', tx:-4 }),
+    lookRight:  () => setEyes({ w:11, h:19, br:'6px', tx:4 }),
+    lookUp:     () => setEyes({ w:11, h:19, br:'6px', ty:-5 }),
+    lookDown:   () => setEyes({ w:11, h:15, br:'6px', ty:4 }),
+    squint:     () => setEyes({ w:12, h:6, br:'4px', ty:1 }),
+    talking:    () => setEyes({ w:10, h:17, br:'5px' }),
+    talkBig:    () => setEyes({ w:12, h:20, br:'6px' }),
+
+    // --- snap 速度 (0s, 瞬间) ---
+    blink:      () => setEyes({ w:12, h:3, br:'3px' }, null, 'snap'),
+
+    // --- fast 速度 (0.08s, 快速反应) ---
+    halfBlink:  () => setEyes({ w:11, h:10, br:'5px' }, null, 'fast'),
+    surprised:  () => setEyes({ w:13, h:21, br:'7px' }, null, 'fast'),
+    wow:        () => setEyes({ w:16, h:16, br:'8px' }, null, 'fast'),
+    sparkle:    () => setEyes({ w:12, h:12, br:'3px', rot:45 }, null, 'fast'),
+    wink:       () => setEyes(
+        { w:13, h:7, br:'7px 7px 3px 3px', ty:1 },
+        { w:11, h:19, br:'6px' }, 'fast'
+    ),
+    winkR:      () => setEyes(
+        { w:11, h:19, br:'6px' },
+        { w:13, h:7, br:'7px 7px 3px 3px', ty:1 }, 'fast'
+    ),
+    dizzy:      () => setEyes(
+        { w:10, h:10, br:'5px', rot:25, tx:-2 },
+        { w:10, h:10, br:'5px', rot:-25, tx:2 }, 'fast'
+    ),
+    cross:      () => setEyes(
+        { w:10, h:3, br:'2px', rot:30 },
+        { w:10, h:3, br:'2px', rot:-30 }, 'fast'
+    ),
+    flattered:  () => setEyes({ w:14, h:20, br:'7px', sy:1.05 }, null, 'fast'),
+    nervous:    () => setEyes({ w:9, h:14, br:'5px', ty:1, sx:0.9 }, null, 'fast'),
+
+    // --- smooth 速度 (0.3s, 情绪过渡) ---
+    happy:      () => setEyes({ w:13, h:7, br:'7px 7px 3px 3px', ty:1 }, null, 'smooth'),
+    superHappy: () => setEyes({ w:15, h:5, br:'8px 8px 3px 3px', ty:1, sx:1.1 }, null, 'smooth'),
+    giggle:     () => setEyes(
+        { w:13, h:7, br:'7px 7px 3px 3px', ty:1, rot:-8 },
+        { w:13, h:7, br:'7px 7px 3px 3px', ty:1, rot:8 }, 'smooth'
+    ),
+    curious:    () => setEyes(
+        { w:9, h:16, br:'5px', ty:-1 },
+        { w:13, h:21, br:'7px', ty:-1 }, 'smooth'
+    ),
+    thinking:   () => setEyes({ w:10, h:17, br:'5px', ty:-3 }, null, 'smooth'),
+    hmm:        () => setEyes(
+        { w:11, h:16, br:'5px', ty:-1, rot:8 },
+        { w:9, h:13, br:'5px', ty:0, rot:-8 }, 'smooth'
+    ),
+    sad:        () => setEyes({ w:10, h:16, br:'5px', ty:3, sy:0.9 }, null, 'smooth'),
+    angry:      () => setEyes(
+        { w:12, h:14, br:'3px 6px 6px 3px', ty:-2, rot:-12 },
+        { w:12, h:14, br:'6px 3px 3px 6px', ty:-2, rot:12 }, 'smooth'
+    ),
+    love:       () => setEyes({ w:14, h:13, br:'7px 1px 7px 1px', rot:45, sx:1.1 }, null, 'smooth'),
+    smug:       () => setEyes(
+        { w:11, h:7, br:'6px 6px 3px 3px', ty:1 },
+        { w:9, h:15, br:'5px', tx:3 }, 'smooth'
+    ),
+    confused:   () => setEyes(
+        { w:11, h:19, br:'6px', ty:-2 },
+        { w:9, h:12, br:'5px', ty:2, rot:15 }, 'smooth'
+    ),
+    softSmile:  () => setEyes({ w:12, h:9, br:'6px 6px 3px 3px', ty:1 }, null, 'smooth'),
+    focus:      () => setEyes({ w:9, h:18, br:'4px', ty:-1 }, null, 'smooth'),
+    pout:       () => setEyes({ w:10, h:11, br:'5px', ty:2, sy:0.85 }, null, 'smooth'),
+    peekL:      () => setEyes(
+        { w:11, h:6, br:'4px', ty:1 },
+        { w:10, h:17, br:'5px', tx:-3 }, 'smooth'
+    ),
+    peekR:      () => setEyes(
+        { w:10, h:17, br:'5px', tx:3 },
+        { w:11, h:6, br:'4px', ty:1 }, 'smooth'
+    ),
+    mischief:   () => setEyes(
+        { w:13, h:14, br:'7px', rot:-5, ty:-1 },
+        { w:9, h:10, br:'5px', rot:10, ty:1 }, 'smooth'
+    ),
+    worried:    () => setEyes(
+        { w:11, h:16, br:'5px', ty:1, rot:5 },
+        { w:11, h:16, br:'5px', ty:1, rot:-5 }, 'smooth'
+    ),
+    sly:        () => setEyes(
+        { w:10, h:14, br:'5px', tx:3, rot:-6 },
+        { w:12, h:8, br:'6px 6px 3px 3px', tx:3, ty:1 }, 'smooth'
+    ),
+
+    // --- slow 速度 (0.45s, 慵懒渐变) ---
+    sleepy:     () => setEyes({ w:12, h:4, br:'4px', ty:2 }, null, 'slow'),
+    drowsy:     () => setEyes({ w:11, h:10, br:'5px', ty:1 }, null, 'slow'),
+    dead:       () => setEyes({ w:10, h:3, br:'2px', ty:3 }, null, 'slow'),
+    content:    () => setEyes({ w:13, h:8, br:'7px 7px 4px 4px', ty:0, sx:1.05 }, null, 'slow'),
+    bliss:      () => setEyes({ w:14, h:5, br:'7px 7px 2px 2px', ty:1, sx:1.1 }, null, 'slow'),
+
+    // --- drift 速度 (0.6s, 缓慢失焦) ---
+    daydream:   () => setEyes({ w:13, h:20, br:'7px', ty:-3, sx:0.95 }, null, 'drift'),
+    blank:      () => setEyes({ w:8, h:15, br:'4px' }, null, 'drift'),
+};
+
+// ===== 鼠标跟随 =====
+let mouseTracking = true;
+document.addEventListener('mousemove', (e) => {
+    if (!mouseTracking) return;
+    const rect = pet.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const dx = Math.max(-2, Math.min(2, (e.clientX - cx) / window.innerWidth * 6));
+    const dy = Math.max(-2, Math.min(2, (e.clientY - cy) / window.innerHeight * 6));
+    eyeL.style.transform = `translate(${dx}px,${dy}px)`;
+    eyeR.style.transform = `translate(${dx}px,${dy}px)`;
+});
+
+// ===== 眨眼（自然节奏）=====
+function doBlink() {
+    if (currentMood === 'sleepy' || currentMood === 'happy') { schedBlink(); return; }
+    mouseTracking = false;
+    EXPR.blink();
+    const r = Math.random();
+    if (r < 0.15) {
+        // 15% 连眨两下
+        setTimeout(() => {
+            EXPR.normal(); setTimeout(() => {
+                EXPR.blink(); setTimeout(() => { applyMoodEyes(); mouseTracking = true; }, 70);
+            }, 100);
+        }, 70);
+    } else if (r < 0.3) {
+        // 15% 半眨 → 全眨
+        setTimeout(() => {
+            EXPR.halfBlink();
+            setTimeout(() => { EXPR.blink(); setTimeout(() => { applyMoodEyes(); mouseTracking = true; }, 80); }, 120);
+        }, 70 + Math.random() * 40);
+    } else if (r < 0.4) {
+        // 10% 慢眨（像在走神）
+        setTimeout(() => {
+            EXPR.halfBlink();
+            setTimeout(() => { applyMoodEyes(); mouseTracking = true; }, 250 + Math.random() * 150);
+        }, 120);
+    } else {
+        // 50% 正常快速眨
+        setTimeout(() => { applyMoodEyes(); mouseTracking = true; }, 70 + Math.random() * 30);
+    }
+    schedBlink();
+}
+function schedBlink() {
+    // 不均匀间隔：偶尔快速连眨，偶尔长时间不眨
+    const base = Math.random() < 0.2 ? 800 + Math.random() * 1500 : 2500 + Math.random() * 5000;
+    setTimeout(doBlink, base);
+}
+schedBlink();
+
+// ===== 点击 =====
+let isDrag = false, startX, startY, dragOffsetX, dragOffsetY, clickCount = 0, clickTimer = null;
+
+pet.addEventListener('mousedown', e => { 
+    isDrag = false; 
+    startX = e.screenX; 
+    startY = e.screenY; 
+    // 记录鼠标在窗口内的相对位置，避免拖动时跳跃
+    dragOffsetX = e.clientX;
+    dragOffsetY = e.clientY;
+});
+document.addEventListener('mousemove', e => {
+    if (startX !== undefined) {
+        if (Math.abs(e.screenX - startX) > 3 || Math.abs(e.screenY - startY) > 3) isDrag = true;
+    }
+    if (isDrag && ipcRenderer) {
+        // 用鼠标位置减去相对偏移，精确定位窗口
+        ipcRenderer.send('drag-pet', { 
+            x: e.screenX, 
+            y: e.screenY,
+            offsetX: dragOffsetX,
+            offsetY: dragOffsetY
+        });
+    }
+});
+document.addEventListener('mouseup', () => { setTimeout(() => { isDrag = false; startX = undefined; }, 30); });
+
+pet.addEventListener('click', () => {
+    if (isDrag) return;
+    clickCount++;
+    clearTimeout(clickTimer);
+    squishing = true;
+    
+    // 🎨 增强点击动画：带颜色脉冲
+    pet.style.animation = 'squish 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    // 点击时球体稍微变亮
+    pet.style.filter = 'brightness(1.15)';
+    
+    setTimeout(() => { 
+        pet.style.animation = ''; 
+        pet.style.filter = '';
+        squishing = false; 
+    }, 350);
+    
+    spawnParticles();
+    mouseTracking = false;
+
+    if (clickCount >= 3) {
+        // 💖 三击超开心模式
+        EXPR.superHappy();
+        blushL.style.background = 'rgba(255,100,100,0.6)';
+        blushR.style.background = 'rgba(255,100,100,0.6)';
+        targetScale = 1.1;
+        // 眼睛也要跟着放大
+        eyeL.style.transform = 'scale(1.15)';
+        eyeR.style.transform = 'scale(1.15)';
+        
+        // 三击打开历史消息
+        if (ipcRenderer) ipcRenderer.invoke('show-history');
+        setTimeout(() => { 
+            resetClick(); 
+            clickCount = 0;
+            eyeL.style.transform = '';
+            eyeR.style.transform = '';
+        }, 1200);
+    } else {
+        // 随机表情 + 眼睛动画
+        const rr = ['happy','wink','winkR','surprised','curious','giggle','sparkle','wow'];
+        EXPR[rr[Math.floor(Math.random()*rr.length)]]();
+        clickTimer = setTimeout(() => { resetClick(); clickCount = 0; }, 800);
+    }
+});
+
+function resetClick() {
+    applyMoodEyes();
+    blushL.style.background = ''; blushR.style.background = '';
+    targetScale = MOODS[currentMood]?.scale || 1;
+    mouseTracking = true;
+}
+
+// 🎨 Hover 交互动画
+pet.addEventListener('mouseenter', () => {
+    if (currentMood === 'sleepy' || currentMood === 'offline') return;
+    // 鼠标进入时眼睛微微睁大
+    eyeL.style.transform = 'scale(1.08)';
+    eyeR.style.transform = 'scale(1.08)';
+    // 球体微微变亮
+    pet.style.filter = 'brightness(1.05)';
+});
+
+pet.addEventListener('mouseleave', () => {
+    eyeL.style.transform = '';
+    eyeR.style.transform = '';
+    pet.style.filter = '';
+});
+
+function spawnParticles() {
+    const colors = ['#ff6b6b','#ffa07a','#ffb347','#ff69b4','#fff','#ffd700'];
+    for (let i = 0; i < 8; i++) {
+        const p = document.createElement('div');
+        const sz = 2 + Math.random() * 3;
+        const a = (Math.PI * 2 / 8) * i + Math.random() * 0.4;
+        const dist = 15 + Math.random() * 25;
+        p.style.cssText = `position:absolute;border-radius:50%;pointer-events:none;
+            width:${sz}px;height:${sz}px;
+            background:${colors[Math.floor(Math.random()*colors.length)]};
+            left:50%;top:50%;opacity:1;
+            transition:transform 0.4s ease-out,opacity 0.4s ease-out;`;
+        particlesEl.appendChild(p);
+        requestAnimationFrame(() => {
+            p.style.transform = `translate(${Math.cos(a)*dist}px,${Math.sin(a)*dist}px)`;
+            p.style.opacity = '0';
+        });
+        setTimeout(() => p.remove(), 450);
+    }
+}
+
+// ===== 情绪 =====
+const MOODS = {
+    // 🔮 升级配色：更鲜明的对比、更丰富的琉璃渐变
+    offline:   { 
+        fluid:'linear-gradient(135deg,#a8a8a8,#c5c5c5)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(120,120,120,0.7),transparent 45%),radial-gradient(circle at 70% 65%,rgba(145,145,145,0.6),transparent 45%)', 
+        b2:'radial-gradient(circle at 60% 30%,rgba(160,160,160,0.35),transparent 40%),radial-gradient(circle at 35% 70%,rgba(110,110,110,0.25),transparent 40%)', 
+        eyes:'sleepy', scale:0.93, bounce:0, speed:'20s' 
+    },
+    idle:      { 
+        fluid:'linear-gradient(135deg,#ffb3ba,#ffe5e9)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(255,90,90,0.9),transparent 45%),radial-gradient(circle at 70% 65%,rgba(255,140,100,0.85),transparent 45%)', 
+        b2:'radial-gradient(circle at 60% 30%,rgba(255,190,140,0.45),transparent 40%),radial-gradient(circle at 35% 70%,rgba(235,70,70,0.35),transparent 40%)', 
+        eyes:'normal', scale:1, bounce:0, speed:'8s' 
+    },
+    happy:     { 
+        fluid:'linear-gradient(135deg,#ffdd99,#ffe0cc)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(255,180,50,0.95),transparent 45%),radial-gradient(circle at 70% 65%,rgba(255,110,110,0.9),transparent 45%)', 
+        b2:'radial-gradient(circle at 50% 50%,rgba(255,220,0,0.5),transparent 45%),radial-gradient(circle at 35% 70%,rgba(255,130,0,0.4),transparent 40%)', 
+        eyes:'happy', scale:1.05, bounce:0.02, speed:'5s' 
+    },
+    talking:   { 
+        fluid:'linear-gradient(135deg,#ffaab3,#ffd5e0)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(255,95,95,0.95),transparent 45%),radial-gradient(circle at 70% 65%,rgba(255,125,85,0.9),transparent 45%)', 
+        b2:'radial-gradient(circle at 60% 30%,rgba(255,170,120,0.55),transparent 40%),radial-gradient(circle at 35% 70%,rgba(240,80,80,0.4),transparent 40%)', 
+        eyes:'talking', scale:1, bounce:0.015, speed:'4s' 
+    },
+    thinking:  { 
+        fluid:'linear-gradient(135deg,#b8d8ff,#e8ddff)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(90,140,245,0.9),transparent 45%),radial-gradient(circle at 70% 65%,rgba(140,90,230,0.85),transparent 45%)', 
+        b2:'radial-gradient(circle at 60% 30%,rgba(170,190,255,0.5),transparent 40%),radial-gradient(circle at 35% 70%,rgba(110,70,210,0.4),transparent 40%)', 
+        eyes:'thinking', scale:1, bounce:0, speed:'12s' 
+    },
+    sleepy:    { 
+        fluid:'linear-gradient(135deg,#d0bebe,#e5d8d8)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(170,130,130,0.7),transparent 45%),radial-gradient(circle at 70% 65%,rgba(190,150,130,0.6),transparent 45%)', 
+        b2:'radial-gradient(circle at 60% 30%,rgba(195,170,160,0.4),transparent 40%),radial-gradient(circle at 35% 70%,rgba(160,120,120,0.3),transparent 40%)', 
+        eyes:'sleepy', scale:0.97, bounce:0, speed:'16s' 
+    },
+    surprised: { 
+        fluid:'linear-gradient(135deg,#ffe8b0,#ffddc8)', 
+        b1:'radial-gradient(circle at 30% 30%,rgba(255,195,40,0.95),transparent 45%),radial-gradient(circle at 70% 65%,rgba(255,115,75,0.9),transparent 45%)', 
+        b2:'radial-gradient(circle at 50% 50%,rgba(255,225,90,0.5),transparent 45%),radial-gradient(circle at 35% 70%,rgba(255,145,45,0.4),transparent 40%)', 
+        eyes:'surprised', scale:1.06, bounce:0, speed:'6s' 
+    },
+};
+
+let currentMood = 'idle', talkInterval = null;
+
+function applyMoodEyes() {
+    const m = MOODS[currentMood];
+    if (m && EXPR[m.eyes]) EXPR[m.eyes]();
+}
+
+function setMood(mood) {
+    const map = { normal:'idle', busy:'talking', excited:'happy' };
+    mood = map[mood] || mood;
+    if (!MOODS[mood]) mood = 'idle';
+    const m = MOODS[mood];
+
+    // 任何情绪变化都算互动
+    lastInteraction = Date.now();
+
+    if (mood !== currentMood) {
+        // 打断上一次未完成的过渡
+        if (_moodTimer) { clearTimeout(_moodTimer); _moodTimer = null; }
+
+        // filter 柔光过渡：亮起 → 换色 → 淡出，遮掩 gradient 跳变
+        fluid.style.transition = 'filter 0.35s ease-in';
+        fluid.style.filter = 'brightness(1.6) blur(2px)';
+
+        _moodTimer = setTimeout(() => {
+            // 峰值时瞬间换色（人眼在高亮度下感知不到跳变）
+            fluid.style.background = m.fluid;
+            blob1.style.background = m.b1;
+            blob2.style.background = m.b2;
+            blob1.style.animation = 'fluid-spin ' + m.speed + ' linear infinite';
+
+            // 淡出回正常
+            fluid.style.transition = 'filter 0.5s ease-out';
+            fluid.style.filter = 'brightness(1) blur(0px)';
+
+            _moodTimer = setTimeout(() => {
+                fluid.style.transition = '';
+                fluid.style.filter = '';
+                _moodTimer = null;
+            }, 550);
+        }, 350);
+    }
+
+    currentMood = mood;
+    blob1.style.animationDuration = m.speed;
+
+    if (mood === 'sleepy') {
+        blob1.style.transition = 'opacity 1.5s ease';
+        blob1.style.opacity = '0.6';
+    } else {
+        blob1.style.transition = 'opacity 1.0s ease';
+        blob1.style.opacity = '1';
+    }
+
+    targetScale = m.scale; breathExtra = m.bounce;
+    mouseTracking = (mood !== 'sleepy' && mood !== 'happy');
+    if (talkInterval) { clearInterval(talkInterval); talkInterval = null; }
+    if (mood === 'talking') {
+        let tog = false;
+        talkInterval = setInterval(() => { tog=!tog; tog ? EXPR.talkBig() : EXPR.talking(); }, 250);
+    } else { applyMoodEyes(); }
+
+    if (mood === 'happy') {
+        blushL.style.transition = 'background 0.8s ease, opacity 0.6s ease';
+        blushR.style.transition = 'background 0.8s ease, opacity 0.6s ease';
+        blushL.style.background = 'rgba(255,120,120,0.4)';
+        blushR.style.background = 'rgba(255,120,120,0.4)';
+    } else {
+        blushL.style.transition = 'background 0.6s ease, opacity 0.4s ease';
+        blushR.style.transition = 'background 0.6s ease, opacity 0.4s ease';
+        blushL.style.background = '';
+        blushR.style.background = '';
+    }
+}
+
+// ===== 待机微表情（心情 + 场景 + 语气 三维触发）=====
+
+// 时间场景判定
+function getTimeScene() {
+    const h = new Date().getHours();
+    if (h >= 6 && h < 11)  return 'morning';
+    if (h >= 11 && h < 14) return 'noon';
+    if (h >= 14 && h < 18) return 'afternoon';
+    if (h >= 18 && h < 22) return 'evening';
+    return 'latenight';
+}
+
+// 语气状态（从 AI 回复文本中提取）
+let lastTone = 'neutral';
+function detectTone(text) {
+    if (!text) return 'neutral';
+    if (/哈哈|嘻嘻|😄|😆|笑|开心|太好了|棒|厉害|不错|好耶/.test(text)) return 'cheerful';
+    if (/害羞|脸红|嘿嘿|😳|😊|人家/.test(text)) return 'shy';
+    if (/生气|可恶|气死|哼|😠|😤|讨厌/.test(text)) return 'annoyed';
+    if (/难过|伤心|唉|😢|😭|呜呜|抱歉|对不起/.test(text)) return 'sad';
+    if (/好奇|为什么|怎么|吗？|呢？|🤔|想想/.test(text)) return 'curious';
+    if (/加油|冲|💪|努力|一定可以|相信/.test(text)) return 'encourage';
+    if (/困|累|😴|哈欠|想睡|好困/.test(text)) return 'tired';
+    if (/惊|天哪|什么|😱|😮|不会吧|哇/.test(text)) return 'surprised';
+    if (/嗯|好的|了解|明白|知道了|收到/.test(text)) return 'calm';
+    return 'neutral';
+}
+
+// === 按心情分组的动作池 ===
+const ACT = {
+    daily: [
+    // 左右张望
+    () => { EXPR.lookLeft(); setTimeout(() => { EXPR.lookRight(); setTimeout(() => EXPR.normal(), 500); }, 500); },
+    // 好奇歪头
+    () => { EXPR.curious(); setTimeout(() => EXPR.normal(), 800); },
+    // 左眼眨
+    () => { EXPR.wink(); setTimeout(() => EXPR.normal(), 700); },
+    // 右眼眨
+    () => { EXPR.winkR(); setTimeout(() => EXPR.normal(), 700); },
+    // 若有所思
+    () => { EXPR.hmm(); setTimeout(() => EXPR.normal(), 800); },
+    // 星星眼
+    () => { EXPR.sparkle(); setTimeout(() => EXPR.normal(), 500); },
+    // 连续眨眼
+    () => { EXPR.blink(); setTimeout(() => EXPR.normal(), 80); setTimeout(() => EXPR.blink(), 250); setTimeout(() => EXPR.normal(), 330); },
+    // 左右快速看
+    () => { EXPR.lookLeft(); setTimeout(() => EXPR.lookRight(), 200); setTimeout(() => EXPR.lookLeft(), 400); setTimeout(() => EXPR.lookRight(), 600); setTimeout(() => EXPR.normal(), 800); },
+    // 双眨确认
+    () => { EXPR.blink(); setTimeout(() => EXPR.normal(), 80); setTimeout(() => EXPR.blink(), 400); setTimeout(() => EXPR.normal(), 480); },
+    // 环顾四周
+    () => { EXPR.lookLeft(); setTimeout(() => EXPR.lookUp(), 350); setTimeout(() => EXPR.lookRight(), 700); setTimeout(() => EXPR.lookDown(), 1050); setTimeout(() => EXPR.normal(), 1400); },
+    // 眯眼偷看
+    () => { EXPR.squint(); setTimeout(() => { EXPR.lookLeft(); setTimeout(() => { EXPR.squint(); setTimeout(() => EXPR.normal(), 300); }, 400); }, 500); },
+    // 抖一抖
+    () => { const s = targetScale; targetScale = 0.92; setTimeout(() => { targetScale = 1.06; setTimeout(() => { targetScale = s; }, 150); }, 150); },
+    // 偷瞄左边 → 假装没事
+    () => { EXPR.peekL(); setTimeout(() => { EXPR.blink(); setTimeout(() => EXPR.normal(), 100); }, 700); },
+    // 偷瞄右边 → 心虚
+    () => { EXPR.peekR(); setTimeout(() => { EXPR.nervous(); setTimeout(() => EXPR.normal(), 400); }, 600); },
+    // 发呆 → 回神
+    () => { EXPR.blank(); setTimeout(() => { EXPR.blink(); setTimeout(() => { EXPR.surprised(); setTimeout(() => EXPR.normal(), 300); }, 100); }, 1200); },
+    // 温柔微笑
+    () => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 1000); },
+    // 专注看什么 → 好奇
+    () => { EXPR.focus(); setTimeout(() => { EXPR.curious(); setTimeout(() => EXPR.normal(), 500); }, 800); },
+    ],
+
+    happy: [
+    // 开心弯眼
+    () => { EXPR.happy(); setTimeout(() => EXPR.normal(), 1000); },
+    // 开心蹦跶
+    () => { EXPR.superHappy(); const s = targetScale; targetScale = 1.1; setTimeout(() => { targetScale = 0.93; }, 200); setTimeout(() => { targetScale = 1.08; EXPR.giggle(); }, 400); setTimeout(() => { targetScale = 0.95; }, 600); setTimeout(() => { targetScale = s; EXPR.happy(); }, 800); setTimeout(() => EXPR.normal(), 1200); },
+    // 咯咯笑
+    () => { EXPR.giggle(); setTimeout(() => EXPR.normal(), 800); },
+    // 弹跳
+    () => { const s = targetScale; EXPR.happy(); targetScale = 0.9; setTimeout(() => { targetScale = 1.12; }, 150); setTimeout(() => { targetScale = 0.93; }, 350); setTimeout(() => { targetScale = 1.05; EXPR.giggle(); }, 500); setTimeout(() => { targetScale = s; EXPR.normal(); }, 700); },
+    // 得意脸
+    () => { EXPR.smug(); setTimeout(() => { EXPR.giggle(); setTimeout(() => EXPR.normal(), 600); }, 700); },
+    // 爱心眼
+    () => { EXPR.love(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,80,120,0.5)'; blushR.style.background = 'rgba(255,80,120,0.5)'; setTimeout(() => { EXPR.superHappy(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1000); setTimeout(() => EXPR.normal(), 1500); },
+    // 满足叹气
+    () => { EXPR.content(); deepBreathPhase = 0.01; setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 800); }, 600); },
+    // 陶醉
+    () => { EXPR.bliss(); blushL.style.transition = 'background 0.4s'; blushR.style.transition = 'background 0.4s'; blushL.style.background = 'rgba(255,100,120,0.3)'; blushR.style.background = 'rgba(255,100,120,0.3)'; setTimeout(() => { EXPR.content(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1200); setTimeout(() => EXPR.normal(), 1800); },
+    // 受宠若惊 → 开心
+    () => { EXPR.flattered(); setTimeout(() => { EXPR.happy(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,90,110,0.35)'; blushR.style.background = 'rgba(255,90,110,0.35)'; }, 500); setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.6s'; blushR.style.transition = 'background 0.6s'; blushL.style.background = ''; blushR.style.background = ''; }, 1200); },
+    ],
+
+    shy: [
+    // 害羞脸红
+    () => { EXPR.happy(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,100,100,0.5)'; blushR.style.background = 'rgba(255,100,100,0.5)'; setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1200); },
+    // 眯眼害羞
+    () => { EXPR.squint(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,100,100,0.4)'; blushR.style.background = 'rgba(255,100,100,0.4)'; setTimeout(() => EXPR.lookDown(), 400); setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1000); },
+    // 半眨低头
+    () => { EXPR.halfBlink(); setTimeout(() => { EXPR.lookDown(); blushL.style.transition = 'background 0.4s'; blushR.style.transition = 'background 0.4s'; blushL.style.background = 'rgba(255,120,100,0.35)'; blushR.style.background = 'rgba(255,120,100,0.35)'; }, 300); setTimeout(() => { EXPR.normal(); blushL.style.background = ''; blushR.style.background = ''; }, 1000); },
+    // 心虚偷看 → 脸红
+    () => { EXPR.nervous(); setTimeout(() => { EXPR.peekR(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,110,100,0.4)'; blushR.style.background = 'rgba(255,110,100,0.4)'; }, 400); setTimeout(() => { EXPR.blink(); }, 900); setTimeout(() => { EXPR.softSmile(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1100); setTimeout(() => EXPR.normal(), 1600); },
+    // 受宠若惊 → 害羞低头
+    () => { EXPR.flattered(); blushL.style.transition = 'background 0.2s'; blushR.style.transition = 'background 0.2s'; blushL.style.background = 'rgba(255,90,100,0.5)'; blushR.style.background = 'rgba(255,90,100,0.5)'; setTimeout(() => EXPR.lookDown(), 500); setTimeout(() => { EXPR.softSmile(); }, 1000); setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.8s'; blushR.style.transition = 'background 0.8s'; blushL.style.background = ''; blushR.style.background = ''; }, 1600); },
+    ],
+
+    thinking: [
+    // 若有所思
+    () => { EXPR.thinking(); setTimeout(() => EXPR.normal(), 800); },
+    // 沉思链
+    () => { EXPR.hmm(); setTimeout(() => { EXPR.thinking(); setTimeout(() => EXPR.normal(), 600); }, 500); },
+    // 好奇歪头
+    () => { EXPR.curious(); setTimeout(() => { EXPR.hmm(); setTimeout(() => EXPR.normal(), 600); }, 500); },
+    // 仰望思考
+    () => { EXPR.lookUp(); setTimeout(() => { EXPR.thinking(); setTimeout(() => EXPR.normal(), 700); }, 500); },
+    // 困惑灵感
+    () => { EXPR.confused(); setTimeout(() => { EXPR.thinking(); setTimeout(() => { EXPR.sparkle(); setTimeout(() => EXPR.normal(), 400); }, 500); }, 600); },
+    // 思考顿悟
+    () => { EXPR.thinking(); setTimeout(() => { EXPR.sparkle(); setTimeout(() => { EXPR.giggle(); setTimeout(() => EXPR.normal(), 500); }, 400); }, 800); },
+    // 专注 → 困惑 → 顿悟
+    () => { EXPR.focus(); setTimeout(() => { EXPR.confused(); setTimeout(() => { EXPR.sparkle(); setTimeout(() => { EXPR.happy(); setTimeout(() => EXPR.normal(), 400); }, 400); }, 500); }, 800); },
+    // 发呆白日梦 → 被拉回来
+    () => { EXPR.daydream(); setTimeout(() => { EXPR.blink(); setTimeout(() => { EXPR.surprised(); setTimeout(() => EXPR.normal(), 300); }, 100); }, 1500); },
+    // 担忧 → 思考 → 释然
+    () => { EXPR.worried(); setTimeout(() => { EXPR.thinking(); setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 600); }, 600); }, 600); },
+    ],
+
+    surprised: [
+    // 大惊
+    () => { EXPR.surprised(); setTimeout(() => EXPR.normal(), 600); },
+    // 大惊好奇
+    () => { EXPR.wow(); setTimeout(() => { EXPR.curious(); setTimeout(() => EXPR.normal(), 600); }, 500); },
+    // 看到好吃的
+    () => { EXPR.wow(); setTimeout(() => EXPR.love(), 400); setTimeout(() => { EXPR.superHappy(); blushL.style.transition = 'background 0.2s'; blushR.style.transition = 'background 0.2s'; blushL.style.background = 'rgba(255,100,100,0.4)'; blushR.style.background = 'rgba(255,100,100,0.4)'; }, 800); setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.6s'; blushR.style.transition = 'background 0.6s'; blushL.style.background = ''; blushR.style.background = ''; }, 1400); },
+    // 受宠若惊 → 陶醉
+    () => { EXPR.flattered(); const s = targetScale; targetScale = 1.05; setTimeout(() => { EXPR.bliss(); targetScale = s; }, 600); setTimeout(() => { EXPR.happy(); }, 1200); setTimeout(() => EXPR.normal(), 1700); },
+    // 惊讶 → 担忧 → 释然
+    () => { EXPR.surprised(); setTimeout(() => { EXPR.worried(); setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 500); }, 600); }, 400); },
+    ],
+
+    sleepy: [
+    // 打盹惊醒
+    () => { EXPR.drowsy(); setTimeout(() => { EXPR.sleepy(); setTimeout(() => { EXPR.surprised(); setTimeout(() => EXPR.normal(), 300); }, 600); }, 400); },
+    // 懒洋洋慢眨
+    () => { EXPR.halfBlink(); setTimeout(() => EXPR.sleepy(), 500); setTimeout(() => EXPR.halfBlink(), 1200); setTimeout(() => EXPR.drowsy(), 1700); setTimeout(() => EXPR.normal(), 2200); },
+    // 伸懒腰
+    () => { const s = targetScale; targetScale = 1.08; EXPR.sleepy(); setTimeout(() => { targetScale = s; EXPR.drowsy(); setTimeout(() => { EXPR.surprised(); setTimeout(() => EXPR.normal(), 300); }, 400); }, 1000); },
+    // 犯困眨眼
+    () => { EXPR.sleepy(); setTimeout(() => { EXPR.blink(); setTimeout(() => EXPR.sleepy(), 400); setTimeout(() => EXPR.normal(), 1200); }, 800); },
+    // 犯困白日梦
+    () => { EXPR.drowsy(); setTimeout(() => { EXPR.daydream(); setTimeout(() => { EXPR.sleepy(); setTimeout(() => { EXPR.blink(); setTimeout(() => EXPR.normal(), 100); }, 800); }, 1000); }, 600); },
+    // 瞌睡点头（身体晃）
+    () => { EXPR.sleepy(); const s = targetScale; targetScale = 0.95; setTimeout(() => { targetScale = 1.02; EXPR.blink(); }, 600); setTimeout(() => { targetScale = 0.93; EXPR.sleepy(); }, 1000); setTimeout(() => { targetScale = s; EXPR.drowsy(); }, 1500); setTimeout(() => EXPR.normal(), 2000); },
+    ],
+
+    sad: [
+    // 难过振作
+    () => { EXPR.sad(); setTimeout(() => { EXPR.drowsy(); setTimeout(() => { EXPR.normal(); setTimeout(() => EXPR.happy(), 200); setTimeout(() => EXPR.normal(), 700); }, 400); }, 600); },
+    // 低头沉思
+    () => { EXPR.sad(); setTimeout(() => { EXPR.lookDown(); setTimeout(() => EXPR.normal(), 600); }, 500); },
+    // 困惑难过
+    () => { EXPR.confused(); setTimeout(() => { EXPR.sad(); setTimeout(() => EXPR.normal(), 700); }, 400); },
+    // 担忧 → 叹气 → 振作
+    () => { EXPR.worried(); deepBreathPhase = 0.01; setTimeout(() => { EXPR.sad(); setTimeout(() => { EXPR.blink(); setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 500); }, 100); }, 700); }, 800); },
+    // 嘟嘴 → 叹气
+    () => { EXPR.pout(); setTimeout(() => { deepBreathPhase = 0.01; EXPR.lookDown(); setTimeout(() => EXPR.normal(), 800); }, 600); },
+    ],
+
+    annoyed: [
+    // 生气跺脚
+    () => { EXPR.angry(); const s = targetScale; targetScale = 1.05; setTimeout(() => { targetScale = 0.95; }, 200); setTimeout(() => { targetScale = 1.05; }, 400); setTimeout(() => { targetScale = s; EXPR.hmm(); }, 600); setTimeout(() => EXPR.normal(), 1000); },
+    // 怒忍深呼吸
+    () => { EXPR.angry(); setTimeout(() => EXPR.squint(), 500); setTimeout(() => { EXPR.blink(); const s = targetScale; targetScale = 1.06; setTimeout(() => { targetScale = s; }, 400); }, 800); setTimeout(() => EXPR.normal(), 1400); },
+    // 翻白眼
+    () => { EXPR.lookUp(); setTimeout(() => { EXPR.lookDown(); setTimeout(() => { EXPR.blink(); setTimeout(() => EXPR.normal(), 200); }, 300); }, 300); },
+    // 摇头
+    () => { EXPR.squint(); EXPR.lookLeft(); setTimeout(() => EXPR.lookRight(), 250); setTimeout(() => EXPR.lookLeft(), 500); setTimeout(() => EXPR.normal(), 750); },
+    // 嘟嘴不满 → 摇头
+    () => { EXPR.pout(); setTimeout(() => { EXPR.lookLeft(); setTimeout(() => { EXPR.lookRight(); setTimeout(() => { EXPR.pout(); setTimeout(() => EXPR.normal(), 400); }, 250); }, 250); }, 500); },
+    // 狡黠侧目 → 生气
+    () => { EXPR.sly(); setTimeout(() => { EXPR.angry(); const s = targetScale; targetScale = 1.04; setTimeout(() => { targetScale = s; EXPR.squint(); }, 400); setTimeout(() => EXPR.normal(), 800); }, 600); },
+    ],
+
+    encourage: [
+    // 闪亮放大
+    () => { EXPR.sparkle(); const s = targetScale; targetScale = 1.08; setTimeout(() => { targetScale = s; EXPR.superHappy(); }, 400); setTimeout(() => EXPR.normal(), 900); },
+    // 开心递进
+    () => { EXPR.happy(); setTimeout(() => { EXPR.superHappy(); setTimeout(() => { EXPR.giggle(); setTimeout(() => EXPR.normal(), 500); }, 400); }, 300); },
+    // 专注 → 星星眼 → 满足
+    () => { EXPR.focus(); setTimeout(() => { EXPR.sparkle(); const s = targetScale; targetScale = 1.06; setTimeout(() => { targetScale = s; EXPR.content(); }, 400); setTimeout(() => EXPR.normal(), 900); }, 500); },
+    ],
+
+    smug: [
+    // 傲娇闭眼
+    () => { EXPR.blink(); setTimeout(() => { EXPR.hmm(); setTimeout(() => EXPR.normal(), 600); }, 300); },
+    // 坏笑脸红
+    () => { EXPR.smug(); blushL.style.transition = 'background 0.3s'; blushR.style.transition = 'background 0.3s'; blushL.style.background = 'rgba(255,120,80,0.3)'; blushR.style.background = 'rgba(255,120,80,0.3)'; setTimeout(() => EXPR.giggle(), 600); setTimeout(() => { EXPR.normal(); blushL.style.transition = 'background 0.6s'; blushR.style.transition = 'background 0.6s'; blushL.style.background = ''; blushR.style.background = ''; }, 1200); },
+    // 调皮 → 狡黠 → 得意
+    () => { EXPR.mischief(); setTimeout(() => { EXPR.sly(); setTimeout(() => { EXPR.smug(); setTimeout(() => EXPR.normal(), 500); }, 500); }, 500); },
+    ],
+
+    dizzy: [
+    // 头晕
+    () => { EXPR.dizzy(); const s = targetScale; targetScale = 0.95; setTimeout(() => { targetScale = 1.03; }, 200); setTimeout(() => { targetScale = 0.97; }, 400); setTimeout(() => { targetScale = s; EXPR.halfBlink(); }, 600); setTimeout(() => EXPR.normal(), 900); },
+    // 装死复活
+    () => { EXPR.dead(); const s = targetScale; targetScale = 0.85; setTimeout(() => { EXPR.blink(); targetScale = 0.9; }, 1500); setTimeout(() => { EXPR.surprised(); targetScale = s; }, 1800); setTimeout(() => EXPR.normal(), 2200); },
+    // 交叉眼晕
+    () => { EXPR.cross(); setTimeout(() => { EXPR.dizzy(); setTimeout(() => { EXPR.halfBlink(); setTimeout(() => EXPR.normal(), 400); }, 500); }, 400); },
+    // 呆滞 → 晕 → 恢复
+    () => { EXPR.blank(); setTimeout(() => { EXPR.dizzy(); const s = targetScale; targetScale = 0.96; setTimeout(() => { targetScale = s; EXPR.blink(); setTimeout(() => { EXPR.confused(); setTimeout(() => EXPR.normal(), 400); }, 100); }, 500); }, 800); },
+    ],
+
+    // === 新增动作池 ===
+    playful: [
+    // 调皮挤眉弄眼
+    () => { EXPR.mischief(); setTimeout(() => { EXPR.wink(); setTimeout(() => { EXPR.giggle(); setTimeout(() => EXPR.normal(), 500); }, 400); }, 600); },
+    // 偷瞄 → 被发现 → 假装没事
+    () => { EXPR.peekL(); setTimeout(() => { EXPR.surprised(); setTimeout(() => { EXPR.nervous(); setTimeout(() => { EXPR.blink(); setTimeout(() => EXPR.normal(), 100); }, 300); }, 300); }, 800); },
+    // 狡黠 → 调皮弹跳
+    () => { EXPR.sly(); const s = targetScale; setTimeout(() => { EXPR.mischief(); targetScale = 1.08; setTimeout(() => { targetScale = 0.94; }, 200); setTimeout(() => { targetScale = s; EXPR.giggle(); }, 400); setTimeout(() => EXPR.normal(), 800); }, 500); },
+    // 做鬼脸
+    () => { EXPR.cross(); const s = targetScale; targetScale = 0.9; setTimeout(() => { EXPR.mischief(); targetScale = 1.05; }, 400); setTimeout(() => { targetScale = s; EXPR.giggle(); }, 700); setTimeout(() => EXPR.normal(), 1100); },
+    ],
+
+    dreamy: [
+    // 白日梦 → 微笑
+    () => { EXPR.daydream(); setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 800); }, 1200); },
+    // 发呆 → 深呼吸 → 惬意
+    () => { EXPR.blank(); deepBreathPhase = 0.01; setTimeout(() => { EXPR.daydream(); setTimeout(() => { EXPR.content(); setTimeout(() => EXPR.normal(), 600); }, 1000); }, 800); },
+    // 陶醉 → 满足
+    () => { EXPR.bliss(); blushL.style.transition = 'background 0.4s'; blushR.style.transition = 'background 0.4s'; blushL.style.background = 'rgba(255,120,130,0.25)'; blushR.style.background = 'rgba(255,120,130,0.25)'; setTimeout(() => { EXPR.content(); blushL.style.transition = 'background 1s'; blushR.style.transition = 'background 1s'; blushL.style.background = ''; blushR.style.background = ''; }, 1500); setTimeout(() => EXPR.normal(), 2200); },
+    // 仰望 → 白日梦 → 温柔微笑
+    () => { EXPR.lookUp(); setTimeout(() => { EXPR.daydream(); setTimeout(() => { EXPR.softSmile(); setTimeout(() => EXPR.normal(), 700); }, 1200); }, 500); },
+    ],
+};
+
+// 时间场景 → 偏好的动作池权重
+const SCENE_WEIGHTS = {
+    morning:   { sleepy: 4, daily: 3, dreamy: 2, shy: 1, thinking: 1 },
+    noon:      { daily: 3, happy: 2, playful: 2, thinking: 1, sleepy: 1 },
+    afternoon: { daily: 3, thinking: 2, happy: 1, dreamy: 1, playful: 1, encourage: 1 },
+    evening:   { daily: 2, happy: 2, dreamy: 2, shy: 1, sleepy: 2 },
+    latenight: { sleepy: 5, dreamy: 2, daily: 1, dizzy: 2, sad: 1 },
+};
+
+// 语气 → 偏好的动作池映射
+const TONE_MAP = {
+    cheerful: 'happy', shy: 'shy', annoyed: 'annoyed', sad: 'sad',
+    curious: 'thinking', encourage: 'encourage', tired: 'sleepy',
+    surprised: 'surprised', calm: 'dreamy', neutral: null,
+};
+
+// 智能选择动作
+function pickIdleAction() {
+    const scene = getTimeScene();
+    const tonePool = TONE_MAP[lastTone];
+
+    // 语气优先：最近有明确语气时 70% 概率按语气选
+    if (tonePool && ACT[tonePool] && Math.random() < 0.7) {
+        lastTone = 'neutral';
+        const pool = ACT[tonePool];
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // 否则按时间场景加权随机
+    const weights = SCENE_WEIGHTS[scene] || SCENE_WEIGHTS.afternoon;
+    const entries = [];
+    for (const [cat, w] of Object.entries(weights)) {
+        if (ACT[cat]) for (let i = 0; i < w; i++) entries.push(cat);
+    }
+    const cat = entries[Math.floor(Math.random() * entries.length)];
+    const pool = ACT[cat];
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+setInterval(() => {
+    if (currentMood !== 'idle' || !mouseTracking) return;
+
+    const idleTime = (Date.now() - lastInteraction) / 1000; // 秒
+
+    // === 无聊渐进系统 ===
+    if (idleTime > 180 && Math.random() < 0.25) {
+        // 3 分钟没互动：打哈欠 / 伸懒腰
+        mouseTracking = false;
+        const r = Math.random();
+        if (r < 0.4) {
+            // 打哈欠：嘴巴张大 → 眯眼 → 发呆
+            EXPR.wow();
+            const s = targetScale;
+            targetScale = 1.06;
+            setTimeout(() => { EXPR.sleepy(); targetScale = s; }, 800);
+            setTimeout(() => { EXPR.drowsy(); }, 1500);
+            setTimeout(() => { EXPR.normal(); mouseTracking = true; }, 2500);
+        } else if (r < 0.7) {
+            // 伸懒腰 → 抖一抖 → 精神
+            const s = targetScale;
+            EXPR.sleepy();
+            targetScale = 1.1;
+            setTimeout(() => { targetScale = 0.92; }, 600);
+            setTimeout(() => { targetScale = 1.06; EXPR.surprised(); }, 900);
+            setTimeout(() => { targetScale = s; EXPR.normal(); mouseTracking = true; }, 1400);
+        } else {
+            // 发呆 → 慢慢回神
+            EXPR.drowsy();
+            setTimeout(() => EXPR.halfBlink(), 1200);
+            setTimeout(() => { EXPR.blink(); }, 2000);
+            setTimeout(() => { EXPR.curious(); }, 2200);
+            setTimeout(() => { EXPR.normal(); mouseTracking = true; }, 2800);
+        }
+        return;
+    }
+
+    if (idleTime > 60 && Math.random() < 0.3) {
+        // 1 分钟没互动：更多张望 / 无聊行为
+        mouseTracking = false;
+        const r = Math.random();
+        if (r < 0.3) {
+            // 叹气：深呼吸 + 半眨眼
+            deepBreathPhase = 0.01;
+            EXPR.halfBlink();
+            setTimeout(() => { EXPR.normal(); mouseTracking = true; }, 1500);
+        } else if (r < 0.6) {
+            // 左右张望，像在找事做
+            EXPR.lookLeft();
+            setTimeout(() => EXPR.lookUp(), 500);
+            setTimeout(() => EXPR.lookRight(), 1000);
+            setTimeout(() => { EXPR.hmm(); }, 1500);
+            setTimeout(() => { EXPR.normal(); mouseTracking = true; }, 2200);
+        } else {
+            // 无聊歪头
+            EXPR.hmm();
+            const s = targetScale;
+            targetScale = 0.97;
+            setTimeout(() => { targetScale = s; EXPR.blink(); }, 1000);
+            setTimeout(() => { EXPR.normal(); mouseTracking = true; }, 1300);
+        }
+        return;
+    }
+
+    // === 常规待机微表情（30% 触发率）===
+    if (Math.random() < 0.3) {
+        mouseTracking = false;
+        pickIdleAction()();
+        setTimeout(() => { mouseTracking = true; }, 1500);
+    }
+}, 4000);
+
+// === 待机眼神游走（独立于微表情）===
+setInterval(() => {
+    if (currentMood !== 'idle' || !mouseTracking) return;
+    if (Math.random() < 0.35) {
+        // 眼睛缓慢飘向一个随机方向，像在"看"什么
+        const dx = (Math.random() - 0.5) * 4;
+        const dy = (Math.random() - 0.5) * 3;
+        eyeL.style.transition = 'transform 0.8s ease';
+        eyeR.style.transition = 'transform 0.8s ease';
+        eyeL.style.transform = `translate(${dx}px,${dy}px)`;
+        eyeR.style.transform = `translate(${dx}px,${dy}px)`;
+        // 停留一会再飘回来
+        setTimeout(() => {
+            eyeL.style.transition = 'transform 1.2s ease';
+            eyeR.style.transition = 'transform 1.2s ease';
+            eyeL.style.transform = '';
+            eyeR.style.transform = '';
+            setTimeout(() => {
+                eyeL.style.transition = '';
+                eyeR.style.transition = '';
+            }, 1200);
+        }, 1500 + Math.random() * 2000);
+    }
+}, 5000);
+
+// 记录互动时间
+pet.addEventListener('mousedown', () => { lastInteraction = Date.now(); });
+document.addEventListener('keydown', () => { lastInteraction = Date.now(); });
+
+// ===== 工具栏 =====
+function toggleInput() {
+    inputBar.classList.toggle('show');
+    if (inputBar.classList.contains('show')) inputEl.focus();
+}
+
+function toggleVoice() {
+    voiceOn = !voiceOn;
+    btnVoice.innerHTML = voiceOn
+        ? '<svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+        : '<svg viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.5-.35 2.18"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>';
+    btnVoice.classList.toggle('active', voiceOn);
+    if (ipcRenderer) ipcRenderer.invoke('set-voice-enabled', voiceOn);
+    setMood('happy');
+    setTimeout(() => setMood('idle'), 1500);
+}
+
+// ===== 模型切换 (CC Switch风格) =====
+const modelBadge = document.getElementById('modelBadge');
+let currentModelColor = '#E8A838';
+
+async function cycleModel() {
+    if (!ipcRenderer) return;
+    setMood('thinking');
+    const model = await ipcRenderer.invoke('model-next');
+    if (model) {
+        updateModelBadge(model);
+        // 球体闪变动画
+        flashModelSwitch(model.color);
+        setMood('happy');
+        setTimeout(() => setMood('idle'), 2000);
+    } else {
+        setMood('idle');
+    }
+}
+
+function updateModelBadge(model) {
+    if (!modelBadge || !model) return;
+    modelBadge.textContent = model.icon;
+    modelBadge.style.color = model.color;
+    currentModelColor = model.color;
+}
+
+function flashModelSwitch(color) {
+    // 球体快速闪变效果
+    const pet = document.getElementById('pet');
+    pet.style.transition = 'filter 0.15s';
+    pet.style.filter = `brightness(1.5) drop-shadow(0 0 15px ${color})`;
+    setTimeout(() => {
+        pet.style.filter = '';
+        pet.style.transition = '';
+    }, 400);
+}
+
+// 初始化时获取当前模型
+if (ipcRenderer) {
+    ipcRenderer.invoke('model-current').then(model => {
+        if (model) updateModelBadge(model);
+    });
+    
+    // 监听模型变更事件（来自托盘菜单切换）
+    ipcRenderer.on('model-changed', (e, model) => {
+        updateModelBadge(model);
+        flashModelSwitch(model.color);
+    });
+}
+
+async function screenshot() {
+    if (!ipcRenderer) return;
+    setMood('thinking');
+    const result = await ipcRenderer.invoke('take-screenshot', 'manual');
+    if (result.success) {
+        setMood('happy');
+        setTimeout(() => setMood('idle'), 2000);
+    } else { setMood('idle'); }
+}
+
+async function send() {
+    const msg = inputEl.value.trim();
+    if (!msg || !ipcRenderer) return;
+    inputEl.value = '';
+    inputBar.classList.remove('show');
+    setMood('thinking');
+    const reply = await ipcRenderer.invoke('openclaw-send', msg);
+    if (reply) { setMood('happy'); setTimeout(() => setMood('idle'), 3000); }
+}
+
+// ===== IPC =====
+if (ipcRenderer) {
+    ipcRenderer.on('new-message', (e, msg) => {
+        setMood('talking');
+        setTimeout(() => setMood('idle'), 3000);
+    });
+    ipcRenderer.on('agent-response', (e, res) => {
+        lastTone = detectTone(res.content);
+        setMood('happy');
+        setTimeout(() => setMood('idle'), 5000);
+    });
+    ipcRenderer.on('status-update', (e, s) => {
+        const wasConnected = isConnected;
+        isConnected = s.connected;
+        if (!wasConnected && isConnected) {
+            // 复活动画！从灰色→彩色
+            setMood('happy');
+            squishing = true;
+            pet.style.animation = 'squish 0.5s ease';
+            setTimeout(() => { pet.style.animation = ''; squishing = false; }, 500);
+            spawnParticles();
+            spawnParticles(); // 双倍粒子庆祝
+            setTimeout(() => setMood('idle'), 3000);
+        } else if (wasConnected && !isConnected) {
+            setMood('offline');
+        }
+    });
+}
+
+// 状态检查
+if (ipcRenderer) {
+    setInterval(async () => {
+        const s = await ipcRenderer.invoke('openclaw-status');
+        const wasConnected = isConnected;
+        isConnected = s.connected;
+        if (!wasConnected && isConnected && currentMood === 'offline') {
+            // 复活！
+            setMood('happy');
+            squishing = true;
+            pet.style.animation = 'squish 0.5s ease';
+            setTimeout(() => { pet.style.animation = ''; squishing = false; }, 500);
+            spawnParticles();
+            spawnParticles();
+            setTimeout(() => setMood('idle'), 3000);
+        } else if (!isConnected && currentMood !== 'offline') {
+            setMood('offline');
+        }
+    }, 10000);
+}
+
+// 初始化 — 先显示离线，等连接成功后复活
+setMood('offline');
+if (ipcRenderer) {
+    setTimeout(async () => {
+        const s = await ipcRenderer.invoke('openclaw-status');
+        isConnected = s.connected;
+        if (isConnected) {
+            setMood('happy');
+            squishing = true;
+            pet.style.animation = 'squish 0.5s ease';
+            setTimeout(() => { pet.style.animation = ''; squishing = false; }, 500);
+            spawnParticles();
+            setTimeout(() => setMood('idle'), 2000);
+        }
+    }, 1500);
+}
+</script>
+</body>
+</html>
