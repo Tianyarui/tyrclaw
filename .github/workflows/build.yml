@@ -18,17 +18,14 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
     
-    - name: Build Windows with timeout
+    - name: Build Windows
       timeout-minutes: 15
-      run: |
-        echo "=== Building Windows ==="
-        npx electron-builder --win --x64 2>&1 || echo "Build exited with code $?"
-        echo "=== Build finished ==="
-        if exist dist dir dist
+      run: npx electron-builder --win --x64
     
     - name: Upload artifact
       if: always()
@@ -48,9 +45,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
     
     - name: Build macOS
       timeout-minutes: 15
